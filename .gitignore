@@ -1,0 +1,18 @@
+# Google Takeout data - personal, do not commit
+*.json
+*.zip
+
+# YouTube Takeout HTML exports (not the app)
+watch-history.html
+search-history.html
+
+# Personal monthly notes
+*_2026.md
+*_2025.md
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/

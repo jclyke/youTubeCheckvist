@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WatchLog — YouTube → Checkvist</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      background: #f5f5f5;
+      color: #333;
+      padding: 24px;
+      min-height: 100vh;
+    }
+
+    h1 {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 24px;
+      color: #111;
+    }
+
+    section {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      border: 1px solid #e0e0e0;
+    }
+
+    section h2 {
+      font-size: 12px;
+      font-weight: 600;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 16px;
+    }
+
+    /* Drop zone */
+    #drop-zone {
+      border: 2px dashed #ccc;
+      border-radius: 6px;
+      padding: 36px;
+      text-align: center;
+      cursor: pointer;
+      color: #888;
+      transition: all 0.2s;
+      user-select: none;
+    }
+
+    #drop-zone:hover, #drop-zone.drag-over {
+      border-color: #4a90e2;
+      color: #4a90e2;
+      background: #f0f7ff;
+    }
+
+    #drop-zone.loaded {
+      border-color: #4caf50;
+      color: #2e7d32;
+      background: #f1f8f1;
+    }
+
+    #file-input { display: none; }
+
+    /* Buttons */
+    .btn-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    button {
+      padding: 6px 14px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      background: white;
+      cursor: pointer;
+      font-size: 13px;
+      color: #333;
+      transition: all 0.15s;
+    }
+
+    button:hover { background: #f0f0f0; border-color: #bbb; }
+
+    button.primary {
+      background: #4a90e2;
+      color: white;
+      border-color: #3a80d2;
+      font-weight: 600;
+    }
+
+    button.primary:hover { background: #3a80d2; }
+
+    button.copy-btn {
+      padding: 4px 10px;
+      font-size: 12px;
+    }
+
+    button.copy-btn.copied {
+      background: #e8f5e9;
+      border-color: #4caf50;
+      color: #2e7d32;
+    }
+
+    /* Month selector */
+    .year-group { margin-bottom: 16px; }
+
+    .year-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .year-label {
+      font-weight: 600;
+      font-size: 15px;
+      min-width: 44px;
+    }
+
+    .year-toggle {
+      font-size: 12px;
+      padding: 2px 8px;
+      color: #555;
+    }
+
+    .month-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding-left: 8px;
+    }
+
+    .month-chip {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 10px;
+      border: 1px solid #e0e0e0;
+      border-radius: 20px;
+      cursor: pointer;
+      background: #fafafa;
+      transition: all 0.15s;
+      font-size: 13px;
+      user-select: none;
+    }
+
+    .month-chip:hover { background: #f0f7ff; border-color: #90b8e8; }
+
+    .month-chip.checked {
+      background: #e3f2fd;
+      border-color: #4a90e2;
+      color: #1565c0;
+      font-weight: 500;
+    }
+
+    .month-chip input[type="checkbox"] { display: none; }
+
+    .month-count {
+      font-size: 11px;
+      color: #aaa;
+      font-weight: 400;
+    }
+
+    .month-chip.checked .month-count { color: #7aabd8; }
+
+    .month-chip.done {
+      opacity: 0.55;
+      border-style: dashed;
+    }
+
+    .month-chip.done::after {
+      content: '✓';
+      font-size: 11px;
+      color: #4caf50;
+      margin-left: 2px;
+    }
+
+    .month-chip.done.checked { opacity: 1; }
+
+    #stats {
+      font-size: 13px;
+      color: #666;
+      margin-left: 4px;
+    }
+
+    /* Output */
+    .month-output { margin-bottom: 28px; }
+
+    .month-output h3 {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #eee;
+      color: #111;
+    }
+
+    .day-card {
+      margin-bottom: 10px;
+      border: 1px solid #e8e8e8;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .day-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 7px 12px;
+      background: #f8f8f8;
+      border-bottom: 1px solid #e8e8e8;
+    }
+
+    .day-header-left {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+
+    .day-title { font-weight: 500; font-size: 13px; }
+
+    .day-meta { font-size: 12px; color: #999; }
+
+    textarea {
+      width: 100%;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 12px;
+      line-height: 1.5;
+      padding: 10px 12px;
+      border: none;
+      resize: vertical;
+      background: #fdfdfd;
+      color: #333;
+      display: block;
+    }
+
+    textarea:focus { outline: 2px solid #4a90e2; outline-offset: -2px; }
+
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <h1>WatchLog — YouTube Watch History → Checkvist</h1>
+
+  <section id="load-section">
+    <h2>1 — Load</h2>
+    <div id="drop-zone">
+      Drop <strong>watch-history.json</strong> here, or click to browse
+    </div>
+    <input type="file" id="file-input" accept=".json">
+  </section>
+
+  <section id="select-section" hidden>
+    <h2>2 — Select Months</h2>
+    <div class="btn-row">
+      <button id="btn-select-all">Select all</button>
+      <button id="btn-deselect-all">Deselect all</button>
+      <span id="stats"></span>
+    </div>
+    <div id="year-groups"></div>
+    <div class="btn-row" style="margin-top: 18px; margin-bottom: 0">
+      <button class="primary" id="btn-generate">Generate output →</button>
+      <button id="btn-clear-done" style="font-size:12px; color:#999; border-color:#ddd">Clear done history</button>
+    </div>
+  </section>
+
+  <section id="output-section" hidden>
+    <h2>3 — Output — paste each day into Checkvist and choose "split into many"</h2>
+    <div id="output-months"></div>
+  </section>
+
+  <script>
+    // ── State ─────────────────────────────────────────────────────────────────
+    let data = {};      // { year: { month: { day: { dow, videos: [lines] } } } }
+    let selected = new Set(); // "YYYY-MM"
+
+    // ── localStorage: done months ─────────────────────────────────────────────
+    const LS_KEY = 'watchlog_done';
+
+    function loadDone() {
+      try { return new Set(JSON.parse(localStorage.getItem(LS_KEY) || '[]')); }
+      catch { return new Set(); }
+    }
+
+    function markDone(monthKey) {
+      const done = loadDone();
+      done.add(monthKey);
+      localStorage.setItem(LS_KEY, JSON.stringify([...done]));
+      const chip = document.querySelector(`[data-month="${monthKey}"]`);
+      if (chip) chip.classList.add('done');
+    }
+
+    const MONTHS = ['January','February','March','April','May','June',
+                    'July','August','September','October','November','December'];
+    const DAYS   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+    // ── Parsing ───────────────────────────────────────────────────────────────
+    function extractVideoId(url) {
+      if (!url) return null;
+      try { return new URL(url).searchParams.get('v') || null; }
+      catch { return null; }
+    }
+
+    function parseWatchHistory(entries) {
+      const result = {};
+      for (const e of entries) {
+        const videoId = extractVideoId(e.titleUrl);
+        if (!videoId) continue;
+
+        const dt = new Date(e.time);
+        if (isNaN(dt)) continue;
+
+        const year  = dt.getUTCFullYear();
+        const month = dt.getUTCMonth() + 1;
+        const day   = dt.getUTCDate();
+        const dow   = dt.getUTCDay();
+
+        const title   = (e.title || '').replace(/^Watched /, '');
+        const channel = (e.subtitles || [])[0]?.name || '';
+        const label   = channel ? `${title} — ${channel}` : title;
+        const safe    = label.replace(/\[/g, '\\[').replace(/\]/g, '\\]');
+        const line    = `  [${safe}](https://www.youtube.com/watch?v=${videoId})`;
+
+        result[year]             ??= {};
+        result[year][month]      ??= {};
+        result[year][month][day] ??= { dow, videos: [] };
+        result[year][month][day].videos.push(line);
+      }
+      return result;
+    }
+
+    // ── Markdown ──────────────────────────────────────────────────────────────
+    function dayMarkdown(year, month, day) {
+      const { dow, videos } = data[year][month][day];
+      const header = `${MONTHS[month - 1]} ${day} (${DAYS[dow]})`;
+      return [header, ' Videos', ...videos].join('\n');
+    }
+
+    // ── Month selector ────────────────────────────────────────────────────────
+    function updateStats() {
+      let totalVideos = 0;
+      for (const key of selected) {
+        const [y, m] = key.split('-').map(Number);
+        for (const d of Object.values(data[y]?.[m] || {}))
+          totalVideos += d.videos.length;
+      }
+      const el = document.getElementById('stats');
+      el.textContent = selected.size
+        ? `${selected.size} month${selected.size > 1 ? 's' : ''} — ${totalVideos.toLocaleString()} videos`
+        : '';
+    }
+
+    function setChipState(key) {
+      const chip = document.querySelector(`[data-month="${key}"]`);
+      if (!chip) return;
+      const on = selected.has(key);
+      chip.classList.toggle('checked', on);
+      chip.querySelector('input').checked = on;
+    }
+
+    function buildYearGroups() {
+      const container = document.getElementById('year-groups');
+      container.innerHTML = '';
+
+      const years = Object.keys(data).map(Number).sort((a, b) => b - a);
+      for (const year of years) {
+        const months = Object.keys(data[year]).map(Number).sort((a, b) => a - b);
+
+        const div = document.createElement('div');
+        div.className = 'year-group';
+        div.innerHTML = `
+          <div class="year-header">
+            <span class="year-label">${year}</span>
+            <button class="year-toggle" data-year="${year}" data-action="all">All</button>
+            <button class="year-toggle" data-year="${year}" data-action="none">None</button>
+          </div>
+          <div class="month-grid"></div>
+        `;
+        container.appendChild(div);
+
+        const grid = div.querySelector('.month-grid');
+        for (const month of months) {
+          const key = `${year}-${String(month).padStart(2, '0')}`;
+          const days = data[year][month];
+          const dayCount   = Object.keys(days).length;
+          const videoCount = Object.values(days).reduce((s, d) => s + d.videos.length, 0);
+
+          const isDone = loadDone().has(key);
+
+          const chip = document.createElement('label');
+          chip.className = 'month-chip' + (isDone ? ' done' : '');
+          chip.dataset.month = key;
+          chip.innerHTML = `
+            <input type="checkbox" value="${key}">
+            ${MONTHS[month - 1]}
+            <span class="month-count">${dayCount}d&thinsp;/&thinsp;${videoCount}v</span>
+          `;
+          grid.appendChild(chip);
+
+          chip.querySelector('input').addEventListener('change', e => {
+            if (e.target.checked) selected.add(key); else selected.delete(key);
+            chip.classList.toggle('checked', e.target.checked);
+            updateStats();
+          });
+        }
+
+        div.querySelectorAll('.year-toggle').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const y    = Number(btn.dataset.year);
+            const act  = btn.dataset.action;
+            Object.keys(data[y]).forEach(m => {
+              const k = `${y}-${String(m).padStart(2, '0')}`;
+              if (act === 'all') selected.add(k); else selected.delete(k);
+              setChipState(k);
+            });
+            updateStats();
+          });
+        });
+      }
+    }
+
+    // ── Output ────────────────────────────────────────────────────────────────
+    function buildOutput() {
+      const container = document.getElementById('output-months');
+      container.innerHTML = '';
+
+      const keys = [...selected].sort();
+      if (!keys.length) {
+        container.innerHTML = '<p style="color:#888">No months selected.</p>';
+        return;
+      }
+
+      for (const key of keys) {
+        const [year, monthStr] = key.split('-').map(Number);
+        const monthDays = data[year][monthStr];
+        const sortedDays = Object.keys(monthDays).map(Number).sort((a, b) => a - b);
+        const videoTotal = sortedDays.reduce((s, d) => s + monthDays[d].videos.length, 0);
+
+        const section = document.createElement('div');
+        section.className = 'month-output';
+        section.innerHTML = `<h3>${MONTHS[monthStr - 1]} ${year} &mdash; ${sortedDays.length} days, ${videoTotal} videos</h3>`;
+
+        for (const day of sortedDays) {
+          const md         = dayMarkdown(year, monthStr, day);
+          const { dow, videos } = monthDays[day];
+          const dayLabel   = `${MONTHS[monthStr - 1]} ${day} (${DAYS[dow]})`;
+          const vCount     = videos.length;
+          const rowCount   = Math.min(vCount + 2, 14);
+
+          const card = document.createElement('div');
+          card.className = 'day-card';
+          card.innerHTML = `
+            <div class="day-header">
+              <div class="day-header-left">
+                <span class="day-title">${dayLabel}</span>
+                <span class="day-meta">${vCount} video${vCount !== 1 ? 's' : ''}</span>
+              </div>
+              <button class="copy-btn">Copy</button>
+            </div>
+            <textarea readonly rows="${rowCount}">${md}</textarea>
+          `;
+          section.appendChild(card);
+
+          card.querySelector('.copy-btn').addEventListener('click', function () {
+            const btn = this;
+            function onCopied() {
+              btn.textContent = 'Copied!';
+              btn.classList.add('copied');
+              setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1500);
+              markDone(key);
+            }
+            navigator.clipboard.writeText(md).then(onCopied).catch(() => {
+              // fallback for file:// or restricted contexts
+              try {
+                const ta = document.createElement('textarea');
+                ta.value = md;
+                ta.style.position = 'fixed';
+                ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+              } catch {}
+              onCopied();
+            });
+          });
+        }
+
+        container.appendChild(section);
+      }
+    }
+
+    // ── File loading ──────────────────────────────────────────────────────────
+    function loadFile(file) {
+      const reader = new FileReader();
+      reader.onload = e => {
+        let entries;
+        try { entries = JSON.parse(e.target.result); }
+        catch { alert('Could not parse JSON — make sure this is watch-history.json'); return; }
+
+        if (!Array.isArray(entries)) {
+          alert('Unexpected format — expected a JSON array');
+          return;
+        }
+
+        data = parseWatchHistory(entries);
+        selected.clear();
+
+        const yearCount  = Object.keys(data).length;
+        const monthCount = Object.values(data).reduce((s, y) => s + Object.keys(y).length, 0);
+        const vidCount   = Object.values(data).reduce((s, y) =>
+          s + Object.values(y).reduce((sy, m) =>
+            sy + Object.values(m).reduce((sm, d) => sm + d.videos.length, 0), 0), 0);
+
+        const dz = document.getElementById('drop-zone');
+        dz.textContent = `✓ ${file.name} — ${vidCount.toLocaleString()} videos across ${monthCount} months (${yearCount} years)`;
+        dz.classList.add('loaded');
+
+        buildYearGroups();
+        document.getElementById('select-section').hidden = false;
+        document.getElementById('output-section').hidden = true;
+        updateStats();
+      };
+      reader.readAsText(file);
+    }
+
+    // ── Event wiring ──────────────────────────────────────────────────────────
+    const dropZone  = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+
+    dropZone.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', e => { if (e.target.files[0]) loadFile(e.target.files[0]); });
+
+    dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+      if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+    });
+
+    document.getElementById('btn-select-all').addEventListener('click', () => {
+      for (const year of Object.keys(data))
+        for (const month of Object.keys(data[year])) {
+          const k = `${year}-${String(month).padStart(2, '0')}`;
+          selected.add(k);
+          setChipState(k);
+        }
+      updateStats();
+    });
+
+    document.getElementById('btn-deselect-all').addEventListener('click', () => {
+      selected.clear();
+      document.querySelectorAll('.month-chip').forEach(el => {
+        el.classList.remove('checked');
+        el.querySelector('input').checked = false;
+      });
+      updateStats();
+    });
+
+    document.getElementById('btn-clear-done').addEventListener('click', () => {
+      localStorage.removeItem(LS_KEY);
+      document.querySelectorAll('.month-chip.done').forEach(el => el.classList.remove('done'));
+    });
+
+    document.getElementById('btn-generate').addEventListener('click', () => {
+      buildOutput();
+      const out = document.getElementById('output-section');
+      out.hidden = false;
+      out.scrollIntoView({ behavior: 'smooth' });
+    });
+  </script>
+</body>
+</html>
