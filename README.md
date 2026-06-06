@@ -1,37 +1,31 @@
 # U531 watchlog
 
-Exports your YouTube watch history from Google Takeout into monthly markdown files, grouped by day — ready to paste into Checkvist or any outliner.
+YouTube Watch History → Checkvist journal importer.
 
-## What it does
+## What It Does
 
-Reads `watch-history.json` from a Google Takeout export, filters to a target month, and writes a markdown file with entries in the format:
+A single-page HTML app that reads your Google Takeout `watch-history.json`, lets you select which months to process, and generates Checkvist-ready markdown — one copyable block per day.
+
+Paste each day's block into your Checkvist monthly journal list and choose **"Split into many"** — Checkvist will create the right hierarchy automatically:
 
 ```
-Videos (April 3)
-
-- [Title — Channel](https://www.youtube.com/watch?v=VIDEO_ID)
-- [Another Title — Channel](https://www.youtube.com/watch?v=VIDEO_ID)
-
-Videos (April 4)
-...
+April 26 (Sunday)
+  Videos
+    Why Healthy 70-Year-Olds SUDDENLY DECLINE — Doctors of Ojai
+    LLMs are a Dead End — Kiraa
 ```
-
-The day header format (`Videos (Month D)`) is intentional — it matches the node structure used in a Checkvist journal where each day has a `Videos` child.
-
-## Requirements
-
-- Python 3.9+
-- `httpx` (`pip install httpx`)
 
 ## Usage
 
-```bash
-python import.py watch-history.json --month 2026-04
-```
+1. Open `index.html` in your browser (no install, no server)
+2. Drop or browse to your `watch-history.json`
+3. Select the months you want (grouped by year, with day/video counts)
+4. Click **Generate output**
+5. For each day card, click **Copy** and paste into the matching Checkvist list → Split into many
 
-This writes `april_2026.md` to the current directory.
+Previously-copied months are dimmed with a ✓ so you can focus on new ones. Use **Clear done history** to reset.
 
-## Getting your Takeout export
+## Getting the Takeout File
 
 1. Go to [takeout.google.com](https://takeout.google.com)
 2. Deselect all → select only **YouTube and YouTube Music**
@@ -39,17 +33,22 @@ This writes `april_2026.md` to the current directory.
 4. Download and extract
 5. File is at: `Takeout/YouTube and YouTube Music/history/watch-history.json`
 
-## Idempotency
+## Output Format
 
-Each YouTube video has a unique ID (`v=...` in the URL). The script uses this as a dedup key — re-running the same month is safe.
+Each day block uses Checkvist's indented hierarchy (one space per level):
+
+```
+April 26 (Sunday)
+ Videos
+  [Title — Channel](https://www.youtube.com/watch?v=VIDEO_ID)
+  [Another Title — Channel](https://www.youtube.com/watch?v=VIDEO_ID2)
+```
+
+Paste with **Split into many** to get the day as a parent node, Videos as a child, and each video link as a grandchild.
 
 ## Notes
 
-- Timestamps in the Takeout file are UTC. Day assignment uses UTC date, which is close enough for a watch log.
-- Entries where the video has been deleted (no `titleUrl`) are silently skipped.
-- The Takeout file typically spans years of history — only the target month is processed.
-
-## Planned
-
-- Auto-tagging via Claude API (tag by topic before insertion)
-- Direct Checkvist push (currently generates markdown for manual review/curation)
+- Timestamps in the Takeout file are UTC; day assignment uses UTC date
+- Entries where the video has been deleted (no URL) are silently skipped
+- The file can be large (30MB+) — handled entirely in-browser, no upload
+- Done-month tracking persists in `localStorage` for that browser
